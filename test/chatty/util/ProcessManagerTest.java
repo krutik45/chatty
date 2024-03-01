@@ -25,7 +25,7 @@ public class ProcessManagerTest {
     @Mock
     Consumer<String> messageListenerMock;
     @Test
-    public void testCommand_InvalidInput() {
+    public void testCommandInvalidInput() {
         // Test with null input
         String resultNull = ProcessManager.command(null, null);
         assertEquals("Invalid input.", resultNull);
@@ -38,7 +38,7 @@ public class ProcessManagerTest {
 
 
     @Test
-    public void testCommand_Exec() throws NoSuchFieldException, IllegalAccessException {
+    public void testCommandExec() throws NoSuchFieldException, IllegalAccessException {
 
 
         // Mock the behavior of the execute method using reflection
