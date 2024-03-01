@@ -69,4 +69,6 @@ public class TimedCounter {
         this.interval = TimeUnit.MILLISECONDS.toNanos(interval);
         clearUp();
     }
+
+
 }
