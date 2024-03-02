@@ -9,7 +9,7 @@ import static org.junit.Assert.assertEquals;
 import static org.mockito.Mockito.*;
 public class TimedCounterTest {
     @Test
-    public void testGetCount() {
+    public void testCounter() {
         // Create a TimedCounter instance with a 2-minute interval (120000 milliseconds)
         TimedCounter timedCounterInstance = new TimedCounter(120000);
         // Increase the count a few times

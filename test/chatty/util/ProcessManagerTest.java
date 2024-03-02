@@ -38,8 +38,7 @@ public class ProcessManagerTest {
 
 
     @Test
-    public void testCommandExec() throws NoSuchFieldException, IllegalAccessException {
-
+    public void testCommandExec() throws IllegalAccessException, NoSuchFieldException {
 
         // Mock the behavior of the execute method using reflection
         Field processesField = ProcessManager.class.getDeclaredField("processes");
@@ -47,7 +46,7 @@ public class ProcessManagerTest {
         processesField.set(null, null); // Set processes map to null to avoid NPE
 
         // Call the command method
-        String input = "exec some_command";
+        String input = "exec command_name";
         String output = ProcessManager.command(input, null);
 
         // Validate the output
