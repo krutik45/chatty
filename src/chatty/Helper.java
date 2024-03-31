@@ -44,34 +44,46 @@ import javax.swing.JLabel;
  * @author tduva
  */
 public class Helper {
-    
+
     private static final Logger LOGGER = Logger.getLogger(Helper.class.getName());
-    
+
     public static final DecimalFormat VIEWERCOUNT_FORMAT = new DecimalFormat();
-    
+
     public static String formatViewerCount(int viewerCount) {
         return VIEWERCOUNT_FORMAT.format(viewerCount);
     }
-    
+
     /**
      * This is a bit ugly since the other functions here don't rely on external
      * data like this, but it works.
      */
     public static ParseChannelHelper parseChannelHelper;
-    
+
     public interface ParseChannelHelper {
         public Collection<String> getFavorites();
+
         public Collection<String> getNamesByCategory(String category);
+
         public boolean isStreamLive(String stream);
     }
-    
+
     /**
      * Parses comma-separated channels from a String.
      * 
      * @param channels The list channels to parse
-     * @param prepend Whether to prepend # if necessary
+     * @param prepend  Whether to prepend # if necessary
      * @return Set of channels sorted as in the String
      */
+
+    private static boolean isValidChannel(String channel, ParseChannelHelper parseChannelHelper) {
+        boolean startsWithBracket = channel.startsWith("[");
+        boolean endsWithBracket = channel.endsWith("]");
+        boolean isLengthGreaterThanTwo = channel.length() > 2;
+        boolean hasNonNullParseChannelHelper = parseChannelHelper != null;
+
+        return startsWithBracket && endsWithBracket && isLengthGreaterThanTwo && hasNonNullParseChannelHelper;
+    }
+
     public static Set<String> parseChannelsFromString(String channels, boolean prepend) {
         String[] parts = channels.split(",");
         Set<String> result = new LinkedHashSet<>();
@@ -80,8 +92,7 @@ public class Helper {
             channel = getChannelFromUrl(channel);
             if (isValidChannel(channel)) {
                 addValidChannel(channel, prepend, result);
-            }
-            else if (channel.startsWith("[") && channel.endsWith("]") && channel.length() > 2 && parseChannelHelper != null) {
+            } else if (isValidChannel(channel, parseChannelHelper)) {
                 String[] catSplit = channel.substring(1, channel.length() - 1).split(" ");
                 String cat = catSplit[0];
                 boolean noChans = false;
@@ -90,19 +101,16 @@ public class Helper {
                 for (int i = 1; i < catSplit.length; i++) {
                     if (catSplit[i].equals("#")) {
                         onlyChans = true;
-                    }
-                    else if (catSplit[i].equals("!#")) {
+                    } else if (catSplit[i].equals("!#")) {
                         noChans = true;
-                    }
-                    else if (catSplit[i].equals("live")) {
+                    } else if (catSplit[i].equals("live")) {
                         onlyLive = true;
                     }
                 }
                 List<String> chans = new ArrayList<>();
                 if (cat.equals("*")) {
                     chans = new ArrayList<>(parseChannelHelper.getFavorites());
-                }
-                else {
+                } else {
                     for (String name : parseChannelHelper.getNamesByCategory(cat)) {
                         if ((!noChans || !name.startsWith("#"))
                                 && (!onlyChans || name.startsWith("#"))) {
@@ -119,7 +127,7 @@ public class Helper {
         }
         return result;
     }
-    
+
     private static void addValidChannel(String channel, boolean prepend, Collection<String> collection) {
         if (isValidChannel(channel)) {
             if (prepend && !channel.startsWith("#")) {
@@ -128,14 +136,14 @@ public class Helper {
             collection.add(StringUtil.toLowerCase(channel));
         }
     }
-    
+
     /**
      * Get the channel name from a Twitch url such as twitch.tv/channel_name and
      * some variants.
      * 
      * @param url The url or other input String
      * @return The channel name from the URL, or the input String if it doesn't
-     * match an expected format
+     *         match an expected format
      */
     public static String getChannelFromUrl(String url) {
         Matcher m = CHANNEL_URL_PATTERN.matcher(url);
@@ -151,7 +159,7 @@ public class Helper {
         }
         return url;
     }
-    
+
     public static TwitchPopoutUrlInfo getPopoutUrlInfo(String url) {
         Matcher m = POPOUT_URL_PATTERN.matcher(url);
         if (m.matches()) {
@@ -159,62 +167,64 @@ public class Helper {
         }
         return null;
     }
-    
+
     public static class TwitchPopoutUrlInfo {
-        
+
         public final String channel;
         public final String type;
         public final String username;
-        
+
         private TwitchPopoutUrlInfo(String channel, String type, String username) {
             this.channel = channel;
             this.type = type;
             this.username = username;
         }
-        
+
     }
-    
+
     public static String[] parseChannels(String channels, boolean prepend) {
         return parseChannelsFromString(channels, prepend).toArray(new String[0]);
     }
-    
+
     public static String[] parseChannels(String channels) {
         return parseChannels(channels, true);
     }
-    
+
     /**
      * Takes a Set of Strings and builds a single comma-separated String of
      * streams out of it.
      * 
      * @param set
-     * @return 
+     * @return
      */
     public static String buildStreamsString(Collection<String> set) {
         String result = "";
         String sep = "";
         for (String channel : set) {
-            result += sep+channel.replace("#", "");
+            result += sep + channel.replace("#", "");
             sep = ", ";
         }
         return result;
     }
-    
+
     public static final String USERNAME_REGEX = "[a-zA-Z0-9][a-zA-Z0-9_]+";
-    public static final Pattern CHANNEL_PATTERN = Pattern.compile("(?i)^#?"+USERNAME_REGEX+"$");
+    public static final Pattern CHANNEL_PATTERN = Pattern.compile("(?i)^#?" + USERNAME_REGEX + "$");
     public static final Pattern CHATROOM_PATTERN = Pattern.compile("(?i)^#?chatrooms:[0-9a-z-:]+$");
-    public static final Pattern STREAM_PATTERN = Pattern.compile("(?i)^"+USERNAME_REGEX+"$");
-    public static final Pattern WHISPER_PATTERN = Pattern.compile("(?i)^\\$"+USERNAME_REGEX+"$");
+    public static final Pattern STREAM_PATTERN = Pattern.compile("(?i)^" + USERNAME_REGEX + "$");
+    public static final Pattern WHISPER_PATTERN = Pattern.compile("(?i)^\\$" + USERNAME_REGEX + "$");
     private static final String TWITCH_URL_PREFIX = "(?:https?://)?(?:www\\.)?twitch\\.tv";
-    private static final Pattern CHANNEL_URL_PATTERN = Pattern.compile(TWITCH_URL_PREFIX+"/("+USERNAME_REGEX+")[/a-zA-Z0-9_]*");
-    private static final Pattern POPOUT_URL_PATTERN = Pattern.compile(String.format("%s/popout/(%s)/([a-z]+)(?:/(%s)[/a-z]*)?",
-            TWITCH_URL_PREFIX, USERNAME_REGEX, USERNAME_REGEX));
-    
+    private static final Pattern CHANNEL_URL_PATTERN = Pattern
+            .compile(TWITCH_URL_PREFIX + "/(" + USERNAME_REGEX + ")[/a-zA-Z0-9_]*");
+    private static final Pattern POPOUT_URL_PATTERN = Pattern
+            .compile(String.format("%s/popout/(%s)/([a-z]+)(?:/(%s)[/a-z]*)?",
+                    TWITCH_URL_PREFIX, USERNAME_REGEX, USERNAME_REGEX));
+
     /**
      * Kind of relaxed valiadation if a channel, which can have a leading # or
      * not, can also be a chatroom.
      * 
      * @param channel
-     * @return 
+     * @return
      */
     public static boolean isValidChannel(String channel) {
         try {
@@ -224,17 +234,17 @@ public class Helper {
             return false;
         }
     }
-    
+
     public static boolean isValidChannelStrict(String channel) {
         return isValidChannel(channel) && channel.startsWith("#");
     }
-    
+
     /**
      * Checks if the given channel is a regular channel, which means it is valid
      * and is not a chatroom.
      *
      * @param channel
-     * @return 
+     * @return
      */
     public static boolean isRegularChannel(String channel) {
         try {
@@ -243,24 +253,24 @@ public class Helper {
             return false;
         }
     }
-    
+
     /**
      * Checks if the given channel is a regular channel, which means it starts
      * with a #, is valid otherwise and is not a chatroom.
      * 
      * @param channel
-     * @return 
+     * @return
      */
     public static boolean isRegularChannelStrict(String channel) {
         return isRegularChannel(channel) && channel.startsWith("#");
     }
-    
+
     /**
      * Checks if the given name is a valid stream (no leading # and valid
      * otherwise, basicially just the username).
      * 
      * @param stream
-     * @return 
+     * @return
      */
     public static boolean isValidStream(String stream) {
         try {
@@ -269,7 +279,7 @@ public class Helper {
             return false;
         }
     }
-    
+
     public static boolean isChatroomChannel(String channel) {
         try {
             return channel.startsWith("#") && CHATROOM_PATTERN.matcher(channel).matches();
@@ -277,7 +287,7 @@ public class Helper {
             return false;
         }
     }
-    
+
     public static boolean isValidWhisperChannel(String channel) {
         try {
             return WHISPER_PATTERN.matcher(channel).matches();
@@ -285,7 +295,7 @@ public class Helper {
             return false;
         }
     }
-    
+
     /**
      * Checks if the given stream/channel is valid and turns it into a channel
      * if necessary (leading # and all lowercase). Can also be a chatroom.
@@ -301,34 +311,34 @@ public class Helper {
             return null;
         }
         if (!channel.startsWith("#")) {
-            channel = "#"+channel;
+            channel = "#" + channel;
         }
         return StringUtil.toLowerCase(channel);
     }
-    
+
     /**
      * If this is a valid channel name, then it turns it into a channel (which
      * means adding the # in front if necessary). Otherwise it just returns the
      * input in all lowercase.
      * 
      * @param chan
-     * @return 
+     * @return
      */
     public static String toChannel(String chan) {
         if (chan == null) {
             return null;
         }
         if (isValidChannel(chan) && !chan.startsWith("#")) {
-            return StringUtil.toLowerCase("#"+chan);
+            return StringUtil.toLowerCase("#" + chan);
         }
         return StringUtil.toLowerCase(chan);
     }
-    
+
     /**
      * Removes a leading # from the channel, if present.
      * 
      * @param channel
-     * @return 
+     * @return
      */
     public static String toStream(String channel) {
         if (channel == null) {
@@ -339,7 +349,7 @@ public class Helper {
         }
         return channel;
     }
-    
+
     public static String toValidStream(String channel) {
         String stream = Helper.toStream(channel);
         if (!isValidStream(stream)) {
@@ -347,15 +357,15 @@ public class Helper {
         }
         return stream;
     }
-    
+
     public static String[] toStream(String[] channels) {
         String[] result = new String[channels.length];
-        for (int i=0;i<channels.length;i++) {
+        for (int i = 0; i < channels.length; i++) {
             result[i] = toStream(channels[i]);
         }
         return result;
     }
-    
+
     public static Collection<String> toStream(Collection<String> channels) {
         List<String> result = new ArrayList<>();
         for (String channel : channels) {
@@ -363,17 +373,17 @@ public class Helper {
         }
         return result;
     }
-    
+
     /**
      * Makes a readable message out of the given reason code.
      * 
      * @param reason
      * @param reasonMessage
-     * @return 
+     * @return
      */
     public static String makeDisconnectReason(int reason, String reasonMessage) {
         String result = "";
-        
+
         switch (reason) {
             case Irc.ERROR_UNKNOWN_HOST:
                 result = Language.getString("chat.error.unknownHost");
@@ -391,20 +401,19 @@ public class Helper {
                 result = Language.getString("chat.error.connectionTimeout");
                 break;
             case Irc.SSL_ERROR:
-                result = "Could not establish secure connection ("+reasonMessage+")";
+                result = "Could not establish secure connection (" + reasonMessage + ")";
                 break;
             case Irc.ERROR_SOCKET_ERROR:
                 result = reasonMessage;
                 break;
         }
-        
+
         if (!result.isEmpty()) {
-            result = " ("+result+")";
+            result = " (" + result + ")";
         }
-        
+
         return result;
     }
-    
 
     /**
      * https://stackoverflow.com/questions/5609500/remove-jargon-but-keep-real-characters/5609532#5609532
@@ -419,21 +428,21 @@ public class Helper {
      * Tests showed no clearly different performance compared to removing any
      * number of characters.
      */
-    private static final Pattern COMBINING_CHARACTERS_STRICT
-            = Pattern.compile("[\\u0300-\\u036f\\u0483-\\u0489\\u1dc0-\\u1dff\\u20d0-\\u20ff\\ufe20-\\ufe2f]{1,}");
-    
-    private static final Pattern COMBINING_CHARACTERS_LENIENT
-            = Pattern.compile("[\\u0300-\\u036f\\u0483-\\u0489\\u1dc0-\\u1dff\\u20d0-\\u20ff\\ufe20-\\ufe2f]{3,}");
-    
+    private static final Pattern COMBINING_CHARACTERS_STRICT = Pattern
+            .compile("[\\u0300-\\u036f\\u0483-\\u0489\\u1dc0-\\u1dff\\u20d0-\\u20ff\\ufe20-\\ufe2f]{1,}");
+
+    private static final Pattern COMBINING_CHARACTERS_LENIENT = Pattern
+            .compile("[\\u0300-\\u036f\\u0483-\\u0489\\u1dc0-\\u1dff\\u20d0-\\u20ff\\ufe20-\\ufe2f]{3,}");
+
     public static final int FILTER_COMBINING_CHARACTERS_OFF = 0;
     public static final int FILTER_COMBINING_CHARACTERS_LENIENT = 1;
     public static final int FILTER_COMBINING_CHARACTERS_STRICT = 2;
-    
+
     /**
      * Replaces combining characters in certain ranges with the given
      * replacement string.
      * 
-     * @param text The input text
+     * @param text        The input text
      * @param replaceWith The text to replace any matching characters with
      * @return The changed text
      */
@@ -446,93 +455,92 @@ public class Helper {
         return text;
     }
 
-    
     private static final Pattern ALL_UPERCASE_LETTERS = Pattern.compile("[A-Z]+");
-    
+
     public static boolean isAllUppercaseLetters(String text) {
         return ALL_UPERCASE_LETTERS.matcher(text).matches();
     }
-    
+
     private static final Replacer HTMLSPECIALCHARS_ENCODE;
     private static final Replacer HTMLSPECIALCHARS_DECODE;
     private static final Replacer TAGS_VALUE_DECODE;
     private static final Replacer TAGS_VALUE_ENCODE;
-    
+
     static {
         Map<String, String> replacements = new HashMap<>();
         replacements.put("&amp;", "&");
         replacements.put("&lt;", "<");
         replacements.put("&gt;", ">");
         replacements.put("&quot;", "\"");
-        
+
         Map<String, String> replacementsReverse = new HashMap<>();
         for (String key : replacements.keySet()) {
             replacementsReverse.put(replacements.get(key), key);
         }
         HTMLSPECIALCHARS_ENCODE = new Replacer(replacementsReverse);
         HTMLSPECIALCHARS_DECODE = new Replacer(replacements);
-        
+
         Map<String, String> replacements2 = new HashMap<>();
         replacements2.put("\\\\s", " ");
         replacements2.put("\\\\n", "\n");
         replacements2.put("\\\\r", "\r");
         replacements2.put("\\\\:", ";");
         replacements2.put("\\\\\\\\", "\\");
-        
+
         Map<String, String> replacements2Reverse = new HashMap<>();
         replacements2Reverse.put("\\s", "\\s");
         replacements2Reverse.put("\n", "\\n");
         replacements2Reverse.put("\r", "\\r");
         replacements2Reverse.put(";", "\\:");
         replacements2Reverse.put("\\\\", "\\\\");
-        
+
         TAGS_VALUE_ENCODE = new Replacer(replacements2Reverse);
         TAGS_VALUE_DECODE = new Replacer(replacements2);
     }
-    
+
     public static String tagsvalue_decode(String s) {
         if (s == null) {
             return null;
         }
         return TAGS_VALUE_DECODE.replace(s);
     }
-    
+
     public static String tagsvalue_encode(String s) {
         if (s == null) {
             return null;
         }
         return TAGS_VALUE_ENCODE.replace(s);
     }
-    
+
     public static String htmlspecialchars_decode(String s) {
         if (s == null) {
             return null;
         }
         return HTMLSPECIALCHARS_DECODE.replace(s);
     }
-    
+
     public static String htmlspecialchars_encode(String s) {
         if (s == null) {
             return null;
         }
         return HTMLSPECIALCHARS_ENCODE.replace(s);
     }
-    
+
     public static String prepareForHtml(String s) {
         if (s == null) {
             return null;
         }
         return htmlspecialchars_encode(s).replaceAll(" ", "&nbsp;").replaceAll("\n", "<br />");
     }
-    
+
     private static final Pattern EMOJI_VARIATION_SELECTOR = Pattern.compile("[\uFE0E\uFE0F]");
-    
+
     /**
      * Remove both the text style and emoji style variation selector from the
      * input.
      * 
      * @param input
-     * @return 
+     * @return
      */
     public static String removeEmojiVariationSelector(String input) {
         if (input == null) {
@@ -540,18 +548,16 @@ public class Helper {
         }
         return EMOJI_VARIATION_SELECTOR.matcher(input).replaceAll("");
     }
-    
+
     private static final Pattern UNDERSCORE = Pattern.compile("_");
-    
+
     public static String replaceUnderscoreWithSpace(String input) {
         return UNDERSCORE.matcher(input).replaceAll(" ");
     }
-    
-    
-    
+
     public static <T> List<T> subList(List<T> list, int start, int end) {
         List<T> subList = new ArrayList<>();
-        for (int i=start;i<end;i++) {
+        for (int i = start; i < end; i++) {
             if (list.size() > i) {
                 subList.add(list.get(i));
             } else {
@@ -560,12 +566,12 @@ public class Helper {
         }
         return subList;
     }
-    
+
     public static void unhandledException() {
         String[] a = new String[0];
         String b = a[1];
     }
-    
+
     public static boolean arrayContainsInt(int[] array, int test) {
         for (int i = 0; i < array.length; i++) {
             if (array[i] == test) {
@@ -574,14 +580,14 @@ public class Helper {
         }
         return false;
     }
-    
+
     /**
      * Splits up a String in the format "Integer1,Integer2" and returns the
      * {@code Integer}s.
      *
      * @param input The input String
      * @return Both {@code Integer} values as a {@code IntegerPair} or
-     * {@code null} if the format was invalid
+     *         {@code null} if the format was invalid
      * @see IntegerPair
      */
     public static IntegerPair getNumbersFromString(String input) {
@@ -597,7 +603,7 @@ public class Helper {
             return null;
         }
     }
-    
+
     /**
      * Gets two {@code Integer} values on creation, which can be accessed with
      * the {@code final} attributes {@code a} and {@code b}.
@@ -605,49 +611,47 @@ public class Helper {
     public static class IntegerPair {
         public final int a;
         public final int b;
-        
+
         public IntegerPair(int a, int b) {
             this.a = a;
             this.b = b;
         }
     }
-    
-    
-    
+
     public static final void main(String[] args) {
-//        System.out.println(htmlspecialchars_encode("< >"));
-//        System.out.println(shortenTo("abcd", 0));
-//        System.out.println(shortenTo("abcd", 1));
-//        System.out.println(shortenTo("abcd", 2));
-//        System.out.println(shortenTo("abcd", 3));
-//        System.out.println(shortenTo("abcd", 4));
-//        System.out.println(shortenTo("abcd", 5));
-//        System.out.println(shortenTo("abcd", -2));
-//        System.out.println(shortenTo("abcd", -3));
-//        System.out.println(shortenTo("abcd", -4));
-//        long start = System.currentTimeMillis();
-//        for (int i=0;i<100000;i++) {
-//            htmlspecialchars_encode("&");
-//        }
-//        System.out.println(System.currentTimeMillis() - start);
-        
+        // System.out.println(htmlspecialchars_encode("< >"));
+        // System.out.println(shortenTo("abcd", 0));
+        // System.out.println(shortenTo("abcd", 1));
+        // System.out.println(shortenTo("abcd", 2));
+        // System.out.println(shortenTo("abcd", 3));
+        // System.out.println(shortenTo("abcd", 4));
+        // System.out.println(shortenTo("abcd", 5));
+        // System.out.println(shortenTo("abcd", -2));
+        // System.out.println(shortenTo("abcd", -3));
+        // System.out.println(shortenTo("abcd", -4));
+        // long start = System.currentTimeMillis();
+        // for (int i=0;i<100000;i++) {
+        // htmlspecialchars_encode("&");
+        // }
+        // System.out.println(System.currentTimeMillis() - start);
+
         System.out.println(Arrays.asList(parseChannels("b,a,b,c")));
-        
+
         System.out.println(getServer("server"));
         System.out.println(getPort("server"));
-        
+
         NumberFormat nf = NumberFormat.getInstance(Locale.ENGLISH);
         nf.setMaximumFractionDigits(1);
-        System.out.println(nf.format(Math.round(74/30.0)*30/60.0));
+        System.out.println(nf.format(Math.round(74 / 30.0) * 30 / 60.0));
     }
-    
+
     /**
      * Checks if the id matches the given User. The id can be one of: $mod,
      * $sub, $turbo, $admin, $broadcaster, $staff, $bot. If the user has the
      * appropriate user status, this returns true. If the id is unknown or the
      * user doesn't have the required status, this returns false.
      * 
-     * @param id The id that is required
+     * @param id   The id that is required
      * @param user The User object to check against
      * @return true if the id is known and matches the User, false otherwise
      */
@@ -696,32 +700,31 @@ public class Helper {
         }
         return false;
     }
-    
+
     public static String checkHttpUrl(String url) {
         if (url == null) {
             return null;
         }
         if (url.startsWith("//")) {
-            url = "https:"+url;
+            url = "https:" + url;
         }
         return url;
     }
-    
+
     /**
      * Return the created URL or null if the given URL is invalid.
      * 
      * @param url
-     * @return 
+     * @return
      */
     public static URL createUrlNoError(String url) {
         try {
             return new URL(url);
-        }
-        catch (MalformedURLException ex) {
+        } catch (MalformedURLException ex) {
             return null;
         }
     }
-    
+
     public static String systemInfo() {
         return String.format("Java: %s (%s / %s) OS: %s (%s/%s) Locale: %s",
                 System.getProperty("java.version"),
@@ -732,57 +735,57 @@ public class Helper {
                 System.getProperty("os.arch"),
                 Locale.getDefault());
     }
-    
+
     /**
      * Top Level Domains (only relevant for URLs not starting with http or www).
      */
     private static final String TLD = "(?:tv|com|org|edu|gov|uk|net|ca|de|jp|fr|au|us|ru|ch|it|nl|se|no|es|me|gl|fm|io|gg|be)";
-    
+
     private static final String MID = "[^\\s]";
-    
+
     private static final String END = "[^:,.\\s]";
-    
+
     /**
      * Start of the URL.
      */
     private static final String S1 = "(?:(?:https?)://|www\\.)";
-    
+
     /**
      * Start of the URL (second possibility).
      */
-    private static final String S2 = "(?:[A-Z0-9.-]+[A-Z0-9]\\."+TLD+"\\b)";
-    
+    private static final String S2 = "(?:[A-Z0-9.-]+[A-Z0-9]\\." + TLD + "\\b)";
+
     /**
      * Complete URL.
      */
-    private static final String T1 = "(?:(?:"+S1+"|"+S2+")"+MID+"*"+END+")";
-    
+    private static final String T1 = "(?:(?:" + S1 + "|" + S2 + ")" + MID + "*" + END + ")";
+
     /**
      * Complete URL (only domain).
      */
-    private static final String T2 = "(?:"+S2+")";
-    
+    private static final String T2 = "(?:" + S2 + ")";
+
     /**
      * The regex String for finding URLs in messages.
      */
-    private static final String URL_REGEX = "(?i)\\b"+T1+"|"+T2;
-    
+    private static final String URL_REGEX = "(?i)\\b" + T1 + "|" + T2;
+
     private static final Pattern URL_PATTERN = Pattern.compile(URL_REGEX);
-    
+
     public static Pattern getUrlPattern() {
         return URL_PATTERN;
     }
-    
+
     public static String buildUrlString(String scheme, String host, String path) {
         try {
             URI uri = new URI(scheme, host, path, null);
             return uri.toASCIIString();
         } catch (URISyntaxException ex) {
-            LOGGER.warning("Error building URL: "+ex);
+            LOGGER.warning("Error building URL: " + ex);
             return null;
         }
     }
-    
+
     /**
      * Retrieve the server part out of a string formatted as "server:port".
      * 
@@ -796,11 +799,11 @@ public class Helper {
         }
         return serverAndPort.substring(0, p);
     }
-    
+
     /**
      * Retrieve the port part out of a string formatted as "server:port".
      * 
-     * @param serverAndPort 
+     * @param serverAndPort
      * @return The parsed port, or -1 if invalid
      */
     public static int getPort(String serverAndPort) {
@@ -808,28 +811,28 @@ public class Helper {
         if (p == -1) {
             return -1;
         }
-        String port = serverAndPort.substring(p+1);
+        String port = serverAndPort.substring(p + 1);
         try {
             return Integer.parseInt(port);
         } catch (NumberFormatException ex) {
             return -1;
         }
     }
-    
+
     private static String makeBanInfoDuration(long duration) {
         if (duration < 120) {
             return String.format("%ds", duration);
         }
         NumberFormat nf = NumberFormat.getInstance();
         nf.setMaximumFractionDigits(1);
-        
-        if (duration < DateTime.HOUR*2) {
-            return String.format("%sm", nf.format(Math.round(duration/30.0)*30/60.0));
+
+        if (duration < DateTime.HOUR * 2) {
+            return String.format("%sm", nf.format(Math.round(duration / 30.0) * 30 / 60.0));
         }
         duration = duration / 60;
-        return String.format("%sh", nf.format(Math.round(duration/30.0)*30/60.0));
+        return String.format("%sh", nf.format(Math.round(duration / 30.0) * 30 / 60.0));
     }
-    
+
     public static String makeBanInfo(long duration, String reason,
             boolean durationEnabled, boolean reasonEnabled, boolean includeBan) {
         String banInfo = "";
@@ -843,14 +846,14 @@ public class Helper {
             }
         }
         // Reason not via IRC anymore
-//        if (reasonEnabled) {
-//            if (reason != null && !reason.isEmpty()) {
-//                banInfo = StringUtil.append(banInfo, " ", "[" + reason + "]");
-//            }
-//        }
+        // if (reasonEnabled) {
+        // if (reason != null && !reason.isEmpty()) {
+        // banInfo = StringUtil.append(banInfo, " ", "[" + reason + "]");
+        // }
+        // }
         return banInfo;
     }
-    
+
     public static String makeBanCommand(User user, long duration, String id) {
         if (duration > 0) {
             return StringUtil.concats("timeout", user.getName(), duration).trim();
@@ -860,7 +863,7 @@ public class Helper {
         }
         return StringUtil.concats("ban", user.getName()).trim();
     }
-    
+
     public static Dimension getDimensionFromParameter(String parameter) {
         if (parameter != null && !parameter.trim().isEmpty()) {
             String[] split = parameter.trim().split("x|\\s");
@@ -878,16 +881,15 @@ public class Helper {
         }
         return null;
     }
-    
+
     public static short parseShort(String input, short defaultValue) {
         try {
             return Short.parseShort(input);
-        }
-        catch (NumberFormatException ex) {
+        } catch (NumberFormatException ex) {
             return defaultValue;
         }
     }
-    
+
     public static String makeDisplayNick(User user, long displayNamesMode) {
         if (user.hasCustomNickSet()) {
             return user.getFullNick();
@@ -906,7 +908,7 @@ public class Helper {
         }
         return user.getFullNick();
     }
-    
+
     public static String encodeFilename(String input) {
         try {
             return URLEncoder.encode(input, "UTF-8");
@@ -914,11 +916,11 @@ public class Helper {
             throw new RuntimeException("Unsupported encoding lol");
         }
     }
-    
+
     public static String encodeFilename2(String input) {
         return input.replaceAll("[%\\.\"\\*/:<>\\?\\\\\\|\\+,\\.;=\\[\\]]", "_");
     }
-    
+
     /**
      * Returns commands split up by '|' and trimmed for leading and trailing
      * whitespace. Only non-empty commands are included.
@@ -929,7 +931,7 @@ public class Helper {
      * Returns: '/echo first' and '/echo second | third'
      * 
      * @param input
-     * @return 
+     * @return
      */
     public static List<String> getChainedCommands(String input) {
         if (StringUtil.isNullOrEmpty(input)) {
@@ -947,16 +949,16 @@ public class Helper {
         }
         return result;
     }
-    
+
     public static String ESCAPE_FOR_CHAIN_COMMAND = "escape-pipe";
-    
+
     public static String escapeForChainCommand(String input) {
         if (input == null) {
             return null;
         }
         return input.replaceAll("(\\|+)", "$1|");
     }
-    
+
     public static String[] getForeachParams(String input) {
         if (StringUtil.isNullOrEmpty(input)) {
             return new String[2];
@@ -972,18 +974,18 @@ public class Helper {
         if (split.length == 2 && !split[1].trim().isEmpty()) {
             command = prepare.apply(split[1]);
         }
-        return new String[]{list, command};
+        return new String[] { list, command };
     }
-    
+
     public static String ESCAPE_FOR_FOREACH_COMMAND = "escape-greater";
-    
+
     public static String escapeForForeachCommand(String input) {
         if (input == null) {
             return null;
         }
         return input.replaceAll("(>+)", "$1>");
     }
-    
+
     public static void addUserParameters(User user, String msgId, String autoModMsgId, Parameters parameters) {
         if (msgId != null) {
             parameters.put("msg-id", msgId);
@@ -1007,15 +1009,15 @@ public class Helper {
         }
         parameters.putObject("user", user);
     }
-    
+
     public static Parameters createRoomParameters(Room room) {
         Parameters parameters = Parameters.create("");
         parameters.putObject("room", room);
         return parameters;
     }
-    
+
     private static final Map<UserNotice, javax.swing.Timer> pointsMerge = new HashMap<>();
-    
+
     /**
      * Must be run in EDT.
      * 
@@ -1025,24 +1027,24 @@ public class Helper {
      * it if no merge will occur in the given time.
      *
      * @param newNotice
-     * @param g 
+     * @param g
      */
     public static void pointsMerge(UserNotice newNotice, MainGui g) {
         UserNotice result = findPointsMerge(newNotice);
         if (result == null) {
             javax.swing.Timer timer = new javax.swing.Timer(1000, e -> {
                 pointsMerge.remove(newNotice);
-                g.printUsernotice(newNotice.type, newNotice.user, newNotice.infoText, newNotice.attachedMessage, newNotice.tags);
+                g.printUsernotice(newNotice.type, newNotice.user, newNotice.infoText, newNotice.attachedMessage,
+                        newNotice.tags);
             });
             timer.setRepeats(false);
             pointsMerge.put(newNotice, timer);
             timer.start();
-        }
-        else {
+        } else {
             g.printUsernotice(result.type, result.user, result.infoText, result.attachedMessage, result.tags);
         }
     }
-    
+
     /**
      * Finds the Points UserNotice that has already been received from PubSub or
      * IRC and merges it accordingly. Stops the timer that would have output the
@@ -1067,11 +1069,12 @@ public class Helper {
             UserNotice ps = found.tags.isFromPubSub() ? found : newNotice;
             UserNotice irc = found.tags.isFromPubSub() ? newNotice : found;
             // Use irc msg, since that would also have the emote tags
-            return new UserNotice(ps.type, ps.user, ps.infoText, irc.attachedMessage, MsgTags.merge(found.tags, newNotice.tags));
+            return new UserNotice(ps.type, ps.user, ps.infoText, irc.attachedMessage,
+                    MsgTags.merge(found.tags, newNotice.tags));
         }
         return null;
     }
-    
+
     public static void setDefaultTimezone(String input) {
         if (!StringUtil.isNullOrEmpty(input)) {
             MainSettings.DEFAULT_TIMEZONE = TimeZone.getDefault();
@@ -1081,7 +1084,7 @@ public class Helper {
             LOGGER.info(String.format("[Timezone] Set to %s [%s]", tz.getDisplayName(), input));
         }
     }
-    
+
     public static void setDefaultLocale(String input) {
         if (!StringUtil.isNullOrEmpty(input)) {
             Locale locale = Locale.forLanguageTag(input);
@@ -1090,7 +1093,7 @@ public class Helper {
                     locale.getDisplayName(), locale.toLanguageTag()));
         }
     }
-    
+
     public static String getErrorMessageWithCause(Throwable ex) {
         Throwable cause = ex.getCause();
         if (cause != null) {
@@ -1100,14 +1103,14 @@ public class Helper {
         }
         return getErrorMessageCompact(ex);
     }
-    
+
     public static String getErrorMessageCompact(Throwable ex) {
         if (ex.getLocalizedMessage() != null) {
-            return ex.getClass().getSimpleName()+": "+ex.getLocalizedMessage();
+            return ex.getClass().getSimpleName() + ": " + ex.getLocalizedMessage();
         }
         return ex.getClass().getSimpleName();
     }
-    
+
     public static String makeSaveResultInfo(List<SaveResult> result) {
         StringBuilder b = new StringBuilder();
         int index = 0;
@@ -1119,30 +1122,27 @@ public class Helper {
             if (r.written) {
                 b.append(String.format("* File written to %s\n",
                         r.filePath));
-            }
-            else if (r.writeError != null) {
+            } else if (r.writeError != null) {
                 b.append(String.format("* Writing failed: %s\n",
                         getErrorMessageCompact(r.writeError)));
             }
-            
+
             // Backup
             if (r.backupWritten) {
                 b.append(String.format("* Backup written to %s\n",
                         r.backupPath));
-            }
-            else if (r.backupError != null) {
+            } else if (r.backupError != null) {
                 b.append(String.format("* Backup failed: %s\n",
                         getErrorMessageCompact(r.backupError)));
-            }
-            else if (r.cancelReason == SaveResult.CancelReason.INVALID_CONTENT) {
+            } else if (r.cancelReason == SaveResult.CancelReason.INVALID_CONTENT) {
                 b.append("* Backup failed: Invalid content\n");
             }
-            
+
             // Removed deprecated
             if (r.removed) {
                 b.append("* Removed unused file\n");
             }
-            
+
             // If anything was appended for this file, add header
             if (b.length() > index) {
                 b.insert(index, String.format("[%s]\n", r.id));
@@ -1151,7 +1151,7 @@ public class Helper {
         }
         return b.toString();
     }
-    
+
     public static Map<String, DockLayout> getLayoutsFromSettings(Settings settings) {
         Map<String, DockLayout> layouts = new HashMap<>();
         Map<String, List> values = settings.getMap("layouts");
@@ -1163,7 +1163,7 @@ public class Helper {
         }
         return layouts;
     }
-    
+
     /**
      * Check if the correct SLF4J binding was loaded, when more bindings than
      * the one in the JAR are found, which seems almost impossible, but just in
@@ -1174,31 +1174,33 @@ public class Helper {
      *
      * Failed to instantiate SLF4J LoggerFactory
      * java.lang.NoClassDefFoundError: org/slf4j/spi/LoggerFactoryBinder at
-     *  java.lang.ClassLoader.defineClass1(Native Method) at
-     *  java.lang.ClassLoader.defineClass(ClassLoader.java:763)
-     *  ...
-     * Caused by: java.lang.ClassNotFoundException: org.slf4j.spi.LoggerFactoryBinder at
-     *  java.net.URLClassLoader.findClass(URLClassLoader.java:382) at
-     *  java.lang.ClassLoader.loadClass(ClassLoader.java:424)
-     *  ...
+     * java.lang.ClassLoader.defineClass1(Native Method) at
+     * java.lang.ClassLoader.defineClass(ClassLoader.java:763)
+     * ...
+     * Caused by: java.lang.ClassNotFoundException:
+     * org.slf4j.spi.LoggerFactoryBinder at
+     * java.net.URLClassLoader.findClass(URLClassLoader.java:382) at
+     * java.lang.ClassLoader.loadClass(ClassLoader.java:424)
+     * ...
      */
     public static void checkSLF4JBinding() {
         try {
-            if (!org.slf4j.LoggerFactory.getILoggerFactory().getClass().getName().equals("org.slf4j.impl.JDK14LoggerFactory")) {
-                throw new RuntimeException("Wrong SLF4F binding: " + org.slf4j.LoggerFactory.getILoggerFactory().getClass().getName());
+            if (!org.slf4j.LoggerFactory.getILoggerFactory().getClass().getName()
+                    .equals("org.slf4j.impl.JDK14LoggerFactory")) {
+                throw new RuntimeException(
+                        "Wrong SLF4F binding: " + org.slf4j.LoggerFactory.getILoggerFactory().getClass().getName());
             }
-        }
-        catch (Throwable ex) {
+        } catch (Throwable ex) {
             startError("An error occured getting logger binding. See debug logs for details.");
             throw ex;
         }
     }
-    
+
     /**
      * Show a simple window with an error, intended only for use when other GUI
      * has not been created yet.
      * 
-     * @param msg 
+     * @param msg
      */
     public static void startError(String msg) {
         JFrame frame = new JFrame();
@@ -1214,11 +1216,12 @@ public class Helper {
         frame.setLocationRelativeTo(null);
         frame.setVisible(true);
     }
-    
-    private static final Instant CHAT_COMMAND_SHUTOFF = ZonedDateTime.of(2023, 2, 10, 0, 0, 0, 0, ZoneId.of("-07:00")).toInstant();
-    
+
+    private static final Instant CHAT_COMMAND_SHUTOFF = ZonedDateTime.of(2023, 2, 10, 0, 0, 0, 0, ZoneId.of("-07:00"))
+            .toInstant();
+
     public static boolean isBeforeChatCommandsShutoff() {
         return Instant.now().isBefore(CHAT_COMMAND_SHUTOFF);
     }
-    
+
 }
