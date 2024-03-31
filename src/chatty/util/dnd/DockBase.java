@@ -2,8 +2,18 @@
 package chatty.util.dnd;
 
 import chatty.util.dnd.DockDropInfo.DropType;
+
+import chatty.util.dnd.DockUtil.BottomSplitCreator;
+import chatty.util.dnd.DockUtil.LeftSplitCreator;
+import chatty.util.dnd.DockUtil.RightSplitCreator;
+import chatty.util.dnd.DockUtil.SplitCreator;
+import chatty.util.dnd.DockUtil.TopSplitCreator;
+
 import java.awt.BorderLayout;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
+
 import javax.swing.JComponent;
 import javax.swing.JPanel;
 import javax.swing.JSplitPane;
@@ -15,12 +25,12 @@ import javax.swing.SwingUtilities;
  * @author tduva
  */
 public class DockBase extends JPanel implements DockChild {
-    
+
     private final DockOverlay overlay;
     private final DockManager manager;
-    
+
     private DockChild child;
-    
+
     public DockBase(DockManager m) {
         setLayout(new BorderLayout());
         child = new DockTabsContainer();
@@ -30,7 +40,7 @@ public class DockBase extends JPanel implements DockChild {
         overlay = new DockOverlay(this);
         this.manager = m;
     }
-    
+
     public DockDropInfo findDrop(DockImportInfo info) {
         DockDropInfo childDrop = child.findDrop(info);
         if (childDrop != null && childDrop.location == DropType.INVALID) {
@@ -38,8 +48,7 @@ public class DockBase extends JPanel implements DockChild {
         }
         if (childDrop != null) {
             return childDrop;
-        }
-        else {
+        } else {
             DropType location = DockDropInfo.determineLocation(this, info.getLocation(this), 20, 80, 0);
             if (location != null && location != DropType.CENTER) {
                 return new DockDropInfo(this, location, DockDropInfo.makeRect(this, location, 20, 0, 80), -1);
@@ -47,32 +56,32 @@ public class DockBase extends JPanel implements DockChild {
         }
         return childDrop;
     }
-    
+
     @Override
     public void addContent(DockContent content) {
         child.addContent(content);
     }
-    
+
     public void requestDrag(boolean allowPopout) {
         manager.requestDrag(allowPopout);
     }
-    
+
     public void startDrag() {
         getRootPane().setGlassPane(overlay);
         overlay.setVisible(true);
         overlay.setOpaque(false);
     }
-    
+
     /**
      * Informs the manager that the drag has stopped. The manager will then
      * inform all bases.
      * 
-     * @param t 
+     * @param t
      */
     public void requestStopDrag(DockTransferable t) {
         manager.requestStopDrag(t);
     }
-    
+
     /**
      * Remove the drag overlay.
      */
@@ -88,12 +97,23 @@ public class DockBase extends JPanel implements DockChild {
 
     @Override
     public void split(DockDropInfo info, DockContent content) {
+        final Map<DropType, SplitCreator> CREATOR_MAP = new HashMap<>();
+
+        CREATOR_MAP.put(DropType.LEFT, new LeftSplitCreator());
+        CREATOR_MAP.put(DropType.RIGHT, new RightSplitCreator());
+        CREATOR_MAP.put(DropType.BOTTOM, new BottomSplitCreator());
+        CREATOR_MAP.put(DropType.TOP, new TopSplitCreator());
+
         if (child.isEmpty()) {
             child.addContent(content);
             return;
         }
         DockTabsContainer newCompTabs = new DockTabsContainer();
-        DockSplit newChildSplit = DockUtil.createSplit(info, child, newCompTabs);
+
+        SplitCreator creator = CREATOR_MAP.get(info.location);
+
+        DockSplit newChildSplit = creator.createSplit(info, child,
+                newCompTabs);
         if (newChildSplit != null) {
             // Configure new child
             applySettings(newChildSplit);
@@ -106,7 +126,7 @@ public class DockBase extends JPanel implements DockChild {
             newCompTabs.addContent(content);
             // Configure old child (now component in new split)
             child.setDockParent(newChildSplit);
-            
+
             // Exchange child
             exchangeChild(newChildSplit);
             // Divider
@@ -124,12 +144,12 @@ public class DockBase extends JPanel implements DockChild {
     public void setBase(DockBase base) {
         // Not applicable, this is the base
     }
-    
+
     @Override
     public void setDockParent(DockChild parent) {
         // Not applicable, this is the top component
     }
-    
+
     @Override
     public DockChild getDockParent() {
         return null;
@@ -150,7 +170,7 @@ public class DockBase extends JPanel implements DockChild {
     public void drop(DockTransferInfo info) {
         // Once a drop was initiated by the user, should reset target path
         info.importInfo.content.setTargetPath(null);
-        
+
         info.importInfo.source.removeContent(info.importInfo.content);
         split(info.dropInfo, info.importInfo.content);
     }
@@ -158,12 +178,12 @@ public class DockBase extends JPanel implements DockChild {
     @Override
     public void replace(DockChild old, DockChild replacement) {
         if (replacement == null) {
-//            System.out.println("BASE EMPTY");
+            // System.out.println("BASE EMPTY");
             manager.baseEmpty(this);
             return;
         }
         if (old == child && old != replacement) {
-    //        System.out.println("BASE REPLACE "+old+"\nWITH "+replacement);
+            // System.out.println("BASE REPLACE "+old+"\nWITH "+replacement);
             remove(child.getComponent());
             replacement.setBase(this);
             replacement.setDockParent(this);
@@ -177,12 +197,12 @@ public class DockBase extends JPanel implements DockChild {
     public List<DockContent> getContents() {
         return child.getContents();
     }
-    
+
     /**
      * When a new tab is active. Also when a split gets removed.
      * 
-     * @param tabs The tab pane the tab was changed in, may be null
-     * @param content 
+     * @param tabs    The tab pane the tab was changed in, may be null
+     * @param content
      */
     public void tabChanged(DockTabs tabs, DockContent content) {
         manager.changedActiveContent(content, false);
@@ -215,11 +235,11 @@ public class DockBase extends JPanel implements DockChild {
         }
         child.setSetting(setting, value);
     }
-    
+
     /**
      * Apply all setting values stored in the manager to the given child.
      * 
-     * @param child 
+     * @param child
      */
     public void applySettings(DockChild child) {
         manager.applySettings(child);
@@ -241,7 +261,7 @@ public class DockBase extends JPanel implements DockChild {
         path.addParent(DockPathEntry.createPopout(popoutId));
         return path;
     }
-    
+
     @Override
     public String toString() {
         return "DockBase";
@@ -261,7 +281,7 @@ public class DockBase extends JPanel implements DockChild {
         DockChild newChild = null;
         if (element instanceof DockLayoutSplit) {
             DockLayoutSplit s = (DockLayoutSplit) element;
-            
+
             DockSplit split = new DockSplit(s.orientation);
             DockChild left = createLayout(s.left, split);
             DockChild right = createLayout(s.right, split);
@@ -269,15 +289,14 @@ public class DockBase extends JPanel implements DockChild {
             split.setDockParent(parent);
             split.setDividerLocation(s.dividerLocation);
             split.setResizeWeight(0.5);
-            
+
             newChild = split;
-        }
-        else if (element instanceof DockLayoutTabs) {
+        } else if (element instanceof DockLayoutTabs) {
             DockLayoutTabs t = (DockLayoutTabs) element;
-            
+
             DockTabsContainer tabs = new DockTabsContainer();
             tabs.setDockParent(parent);
-            
+
             newChild = tabs;
         }
         if (newChild != null) {
@@ -291,7 +310,7 @@ public class DockBase extends JPanel implements DockChild {
         }
         return newChild;
     }
-    
+
     private void exchangeChild(DockChild newChild) {
         remove(child.getComponent());
         child = newChild;
@@ -302,5 +321,5 @@ public class DockBase extends JPanel implements DockChild {
     public void sortContent(DockContent content) {
         child.sortContent(content);
     }
-    
+
 }

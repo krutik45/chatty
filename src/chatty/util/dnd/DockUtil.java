@@ -19,26 +19,39 @@ import javax.swing.TransferHandler;
  * @author tduva
  */
 public class DockUtil {
-    
-    public static DockSplit createSplit(DockDropInfo info, DockChild prev, DockChild added) {
-        DockSplit result = null;
-        switch (info.location) {
-            case LEFT:
-                result = new DockSplit(JSplitPane.HORIZONTAL_SPLIT, added, prev);
-                break;
-            case RIGHT:
-                result = new DockSplit(JSplitPane.HORIZONTAL_SPLIT, prev, added);
-                break;
-            case BOTTOM:
-                result = new DockSplit(JSplitPane.VERTICAL_SPLIT, prev, added);
-                break;
-            case TOP:
-                result = new DockSplit(JSplitPane.VERTICAL_SPLIT, added, prev);
-                break;
-        }
-        return result;
+
+    public static abstract class SplitCreator {
+        abstract DockSplit createSplit(DockDropInfo info, DockChild prev, DockChild added);
     }
-    
+
+    public static class TopSplitCreator extends SplitCreator {
+        @Override
+        DockSplit createSplit(DockDropInfo info, DockChild prev, DockChild added) {
+            return new DockSplit(JSplitPane.VERTICAL_SPLIT, added, prev);
+        }
+    }
+
+    public static class LeftSplitCreator extends SplitCreator {
+        @Override
+        DockSplit createSplit(DockDropInfo info, DockChild prev, DockChild added) {
+            return new DockSplit(JSplitPane.HORIZONTAL_SPLIT, added, prev);
+        }
+    }
+
+    public static class BottomSplitCreator extends SplitCreator {
+        @Override
+        DockSplit createSplit(DockDropInfo info, DockChild prev, DockChild added) {
+            return new DockSplit(JSplitPane.VERTICAL_SPLIT, prev, added);
+        }
+    }
+
+    public static class RightSplitCreator extends SplitCreator {
+        @Override
+        DockSplit createSplit(DockDropInfo info, DockChild prev, DockChild added) {
+            return new DockSplit(JSplitPane.HORIZONTAL_SPLIT, prev, added);
+        }
+    }
+
     public static boolean isMouseOverWindow() {
         Point p = MouseInfo.getPointerInfo().getLocation();
         for (Window w : Window.getWindows()) {
@@ -48,48 +61,45 @@ public class DockUtil {
         }
         return false;
     }
-    
+
     public static DockTransferable getTransferable(TransferHandler.TransferSupport info) {
         try {
             return (DockTransferable) info.getTransferable().getTransferData(DockTransferable.FLAVOR);
-        }
-        catch (IOException | UnsupportedFlavorException ex) {
+        } catch (IOException | UnsupportedFlavorException ex) {
             System.out.println(ex);
             return null;
         }
     }
-    
+
     public static DockTransferable getTransferable(Transferable t) {
         try {
             return (DockTransferable) t.getTransferData(DockTransferable.FLAVOR);
-        }
-        catch (IOException | UnsupportedFlavorException ex) {
+        } catch (IOException | UnsupportedFlavorException ex) {
             System.out.println(ex);
             return null;
         }
     }
-    
+
     /**
      * When a split is removed, choose a tab from the remaining child as active
      * (child may be another split or tabs directly).
      * 
      * @param child The remaining child from the split
-     * @param base The base to inform
+     * @param base  The base to inform
      */
     public static void activeTabAfterJoin(DockChild child, DockBase base) {
         if (base == null) {
             return;
         }
         if (child instanceof DockTabsContainer) {
-            DockTabsContainer tabs = (DockTabsContainer)child;
+            DockTabsContainer tabs = (DockTabsContainer) child;
             base.tabChanged(null, tabs.getCurrentContent());
-        }
-        else if (child instanceof DockSplit) {
+        } else if (child instanceof DockSplit) {
             // Keep looking for tabs in the left child of the split
-            activeTabAfterJoin(((DockSplit)child).getLeftChild(), base);
+            activeTabAfterJoin(((DockSplit) child).getLeftChild(), base);
         }
     }
-    
+
     public static DockPathEntry getNext(DockContent content, DockChild current) {
         DockPath target = content.getTargetPath();
         if (target != null) {
@@ -97,18 +107,18 @@ public class DockUtil {
         }
         return null;
     }
-    
+
     /**
      * Exchanging a component can reset the divider location (seems affected by
      * resize weight), so set previous location again.
      * 
-     * @param split 
+     * @param split
      */
     public static void preserveDividerLocation(JSplitPane split) {
         int location = split.getDividerLocation();
         SwingUtilities.invokeLater(() -> split.setDividerLocation(location));
     }
-    
+
     public static List<String> getContentIds(List<DockContent> contents) {
         List<String> ids = new ArrayList<>();
         for (DockContent c : contents) {
@@ -118,12 +128,12 @@ public class DockUtil {
         }
         return ids;
     }
-    
+
     /**
      * Get the DockContent with the given id from the Collection.
      * 
      * @param contents The Collection to get the DockContent from
-     * @param id The id of the DockContent to find
+     * @param id       The id of the DockContent to find
      * @return The DockContent, or null if none could be found
      */
     public static DockContent getContentById(Collection<DockContent> contents, String id) {
@@ -134,12 +144,12 @@ public class DockUtil {
         }
         return null;
     }
-    
+
     /**
      * Return a new list containing only the content that has an id starting
      * with the given prefix.
      * 
-     * @param input The input list (not modified)
+     * @param input  The input list (not modified)
      * @param prefix The prefix
      * @return The new list (could be empty, never null)
      */
@@ -152,5 +162,5 @@ public class DockUtil {
         }
         return result;
     }
-    
+
 }

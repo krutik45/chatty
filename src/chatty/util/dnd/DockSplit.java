@@ -1,6 +1,13 @@
 
 package chatty.util.dnd;
 
+import chatty.util.dnd.DockDropInfo.DropType;
+import chatty.util.dnd.DockUtil.BottomSplitCreator;
+import chatty.util.dnd.DockUtil.LeftSplitCreator;
+import chatty.util.dnd.DockUtil.RightSplitCreator;
+import chatty.util.dnd.DockUtil.SplitCreator;
+import chatty.util.dnd.DockUtil.TopSplitCreator;
+
 import chatty.util.Debugging;
 import chatty.util.dnd.DockDropInfo.DropType;
 import java.awt.Color;
@@ -8,7 +15,10 @@ import java.awt.Dimension;
 import java.awt.Point;
 import java.awt.Rectangle;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
+
 import javax.swing.BorderFactory;
 import javax.swing.JComponent;
 import javax.swing.JSplitPane;
@@ -20,25 +30,25 @@ import javax.swing.SwingUtilities;
  * @author tduva
  */
 public class DockSplit extends JSplitPane implements DockChild {
-    
+
     private DockBase base;
     private DockChild parent;
-    
+
     private DockChild left;
     private DockChild right;
-    
+
     public DockSplit(int orientation, DockChild left, DockChild right) {
         super(orientation, left.getComponent(), right.getComponent());
-//        if (left instanceof JSplitPane) {
-//            ((JSplitPane)left).setBorder(null);
-//        }
-//        if (right instanceof JSplitPane) {
-//            ((JSplitPane)right).setBorder(null);
-//        }
+        // if (left instanceof JSplitPane) {
+        // ((JSplitPane)left).setBorder(null);
+        // }
+        // if (right instanceof JSplitPane) {
+        // ((JSplitPane)right).setBorder(null);
+        // }
         this.left = left;
         this.right = right;
     }
-    
+
     public DockSplit(int orientation) {
         super(orientation);
     }
@@ -47,15 +57,15 @@ public class DockSplit extends JSplitPane implements DockChild {
     public JComponent getComponent() {
         return this;
     }
-    
+
     public DockChild getLeftChild() {
         return left;
     }
-    
+
     public DockChild getRightChild() {
         return right;
     }
-    
+
     public void setChildren(DockChild left, DockChild right) {
         setLeftComponent(left.getComponent());
         setRightComponent(right.getComponent());
@@ -65,19 +75,27 @@ public class DockSplit extends JSplitPane implements DockChild {
 
     @Override
     public void split(DockDropInfo info, DockContent content) {
-        //        System.out.println("LEFT: "+left+" DROP: "+info.dropComponent+" RIGHT: "+right);
+        // System.out.println("LEFT: "+left+" DROP: "+info.dropComponent+" RIGHT:
+        // "+right);
+
+        final Map<DropType, SplitCreator> CREATOR_MAP = new HashMap<>();
+        CREATOR_MAP.put(DropType.LEFT, new LeftSplitCreator());
+        CREATOR_MAP.put(DropType.RIGHT, new RightSplitCreator());
+        CREATOR_MAP.put(DropType.BOTTOM, new BottomSplitCreator());
+        CREATOR_MAP.put(DropType.TOP, new TopSplitCreator());
+
         DockChild presentComp = null;
         if (checkComponent(left, info)) {
             presentComp = left;
-        }
-        else if (checkComponent(right, info)) {
+        } else if (checkComponent(right, info)) {
             presentComp = right;
         }
         if (presentComp == null) {
             return;
         }
         DockTabsContainer newCompTabs = new DockTabsContainer();
-        DockSplit newChildSplit = DockUtil.createSplit(info, presentComp, newCompTabs);
+        SplitCreator creator = CREATOR_MAP.get(info.location);
+        DockSplit newChildSplit = creator.createSplit(info, presentComp, newCompTabs);
         if (newChildSplit != null) {
             // Configure child first
             base.applySettings(newChildSplit);
@@ -90,13 +108,12 @@ public class DockSplit extends JSplitPane implements DockChild {
             newCompTabs.addContent(content);
             // Configure present comp
             presentComp.setDockParent(newChildSplit);
-            
+
             // Exchange left or right component
             if (checkComponent(left, info)) {
                 setLeftComponent(newChildSplit);
                 left = newChildSplit;
-            }
-            else if (checkComponent(right, info)) {
+            } else if (checkComponent(right, info)) {
                 setRightComponent(newChildSplit);
                 right = newChildSplit;
             }
@@ -111,7 +128,7 @@ public class DockSplit extends JSplitPane implements DockChild {
             DockUtil.preserveDividerLocation(this);
         }
     }
-    
+
     private boolean checkComponent(DockChild parent, DockDropInfo info) {
         if (parent == info.dropComponent) {
             return true;
@@ -127,16 +144,14 @@ public class DockSplit extends JSplitPane implements DockChild {
             if (next.type == DockPathEntry.Type.SPLIT
                     && (next.location == DropType.RIGHT || next.location == DropType.BOTTOM)) {
                 right.addContent(content);
-            }
-            else {
+            } else {
                 left.addContent(content);
             }
-        }
-        else {
+        } else {
             left.addContent(content);
         }
     }
-    
+
     @Override
     public void removeContent(DockContent content) {
         left.removeContent(content);
@@ -150,18 +165,18 @@ public class DockSplit extends JSplitPane implements DockChild {
 
     @Override
     public DockDropInfo findDrop(DockImportInfo info) {
-//        System.out.println(info.getLocation(this)+" "+getLeftComponent().getBounds()+" "+getRightComponent().getBounds());
+        // System.out.println(info.getLocation(this)+"
+        // "+getLeftComponent().getBounds()+" "+getRightComponent().getBounds());
         Rectangle leftBounds = getLeftComponent().getBounds();
         Point p = info.getLocation(this);
         if (leftBounds.contains(p)) {
             return left.findDrop(info);
-        }
-        else if (getRightComponent().getBounds().contains(p)) {
+        } else if (getRightComponent().getBounds().contains(p)) {
             return right.findDrop(info);
         }
         return null;
     }
-    
+
     @Override
     public boolean isEmpty() {
         // If the split exists, it should probably always contain content, but
@@ -178,18 +193,17 @@ public class DockSplit extends JSplitPane implements DockChild {
     public void setDockParent(DockChild parent) {
         this.parent = parent;
     }
-    
+
     @Override
     public DockChild getDockParent() {
         return parent;
     }
-    
+
     @Override
     public String toString() {
         if (getOrientation() == JSplitPane.HORIZONTAL_SPLIT) {
             return String.format("%s || %s", left, right);
-        }
-        else {
+        } else {
             return String.format("%s -- %s", left, right);
         }
     }
@@ -201,22 +215,19 @@ public class DockSplit extends JSplitPane implements DockChild {
                 // Remove "left" side (close this split, replace with "right")
                 parent.replace(this, right);
                 DockUtil.activeTabAfterJoin(right, base);
-            }
-            else {
+            } else {
                 // Exchange "left" side (keep this split open)
                 setLeftComponent(replacement.getComponent());
                 left = replacement;
                 replacement.setDockParent(this);
                 DockUtil.preserveDividerLocation(this);
             }
-        }
-        else if (old == right) {
+        } else if (old == right) {
             if (replacement == null) {
                 // Remove "right" side (close this split, replace with "left")
                 parent.replace(this, left);
                 DockUtil.activeTabAfterJoin(left, base);
-            }
-            else {
+            } else {
                 // Exchange "right" side (keep this split open)
                 setRightComponent(replacement.getComponent());
                 right = replacement;
@@ -249,8 +260,7 @@ public class DockSplit extends JSplitPane implements DockChild {
     public List<DockContent> getContentsRelativeTo(DockContent content, int direction) {
         if (left.getContents().contains(content)) {
             return left.getContentsRelativeTo(content, direction);
-        }
-        else {
+        } else {
             return right.getContentsRelativeTo(content, direction);
         }
     }
@@ -259,12 +269,12 @@ public class DockSplit extends JSplitPane implements DockChild {
     public void setSetting(DockSetting.Type setting, Object value) {
         left.setSetting(setting, value);
         right.setSetting(setting, value);
-        
+
         if (setting == DockSetting.Type.DEBUG) {
             setBorder(value == Boolean.TRUE ? BorderFactory.createLineBorder(Color.BLUE, 4) : null);
         }
         if (setting == DockSetting.Type.DIVIDER_SIZE) {
-            setDividerSize(((Number)value).intValue());
+            setDividerSize(((Number) value).intValue());
         }
     }
 
@@ -279,16 +289,13 @@ public class DockSplit extends JSplitPane implements DockChild {
         if (child == left) {
             if (getOrientation() == HORIZONTAL_SPLIT) {
                 type = DropType.LEFT;
-            }
-            else {
+            } else {
                 type = DropType.TOP;
             }
-        }
-        else if (child == right) {
+        } else if (child == right) {
             if (getOrientation() == HORIZONTAL_SPLIT) {
                 type = DropType.RIGHT;
-            }
-            else {
+            } else {
                 type = DropType.BOTTOM;
             }
         }
@@ -298,7 +305,8 @@ public class DockSplit extends JSplitPane implements DockChild {
 
     @Override
     public DockLayoutElement getLayoutElement() {
-        return new DockLayoutSplit(left.getLayoutElement(), right.getLayoutElement(), getDividerLocation(), getOrientation());
+        return new DockLayoutSplit(left.getLayoutElement(), right.getLayoutElement(), getDividerLocation(),
+                getOrientation());
     }
 
     @Override
@@ -312,5 +320,5 @@ public class DockSplit extends JSplitPane implements DockChild {
         left.sortContent(content);
         right.sortContent(content);
     }
-    
+
 }
